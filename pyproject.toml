@@ -1,0 +1,96 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "glassbox-hiring"
+version = "0.1.0"
+description = "Open, auditable implementations of the algorithms behind ATS resume screening and gamified hiring assessment."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = [
+    "adverse-impact", "four-fifths-rule", "eeoc", "ugesp", "bias-audit",
+    "local-law-144", "algorithmic-hiring", "ats", "resume-parsing",
+    "psychometrics", "fairness", "aedt",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Intended Audience :: Legal Industry",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Sociology",
+]
+
+# The audit core is deliberately dependency-free. Its predecessor in this space
+# (pymetrics/audit-ai) became unusable through dependency rot, not incorrect
+# statistics -- so `pip install glassbox-hiring` pulls in nothing at all, and an
+# audit run today reproduces in ten years.
+dependencies = []
+
+[project.optional-dependencies]
+# Document parsing needs real PDF/DOCX readers; kept optional so a compliance user
+# auditing score files never installs them.
+parse = [
+    "pdfminer.six>=20231228",
+    "pypdf>=4.0",
+    "python-docx>=1.1",
+]
+# Vendor-atlas scraper.
+scrape = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.1",
+    "pyyaml>=6.0",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+    "mypy>=1.11",
+]
+all = ["glassbox-hiring[parse,scrape]"]
+
+[project.urls]
+Homepage = "https://github.com/SafeerAhmad211/glassbox-hiring"
+Repository = "https://github.com/SafeerAhmad211/glassbox-hiring"
+Issues = "https://github.com/SafeerAhmad211/glassbox-hiring/issues"
+Methodology = "https://github.com/SafeerAhmad211/glassbox-hiring/blob/main/research/TEARDOWN.md"
+
+[project.scripts]
+glassbox = "glassbox.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/glassbox"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 90
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
+ignore = [
+    "E501",
+    # Typographic characters are load-bearing here, not accidents. Word processors
+    # autocorrect "2020-2024" into "2020–2024", so the date-range parser must match
+    # en and em dashes or it silently reports real resumes as having no experience.
+    # The reports also use — and ⚠ deliberately.
+    "RUF001",
+    "RUF002",
+    "RUF003",
+]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true

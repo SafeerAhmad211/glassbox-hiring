@@ -1,0 +1,18 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+.env
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+graphify-out/.graphify_*
+examples/*.pdf
+
+# Third-party papers are fetched locally, never redistributed (copyright).
+research/raw/

@@ -1,0 +1,61 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev,parse]"
+
+      - name: Verify the audit core has no third-party imports
+        # The zero-dependency guarantee is load-bearing: it is why an audit run today
+        # still reproduces years from now. Assert it rather than trusting review.
+        shell: python
+        run: |
+          import ast, pathlib, sys
+          allowed = set(sys.stdlib_module_names) | {"glassbox"}
+          bad = []
+          for path in pathlib.Path("src/glassbox/audit").rglob("*.py"):
+              tree = ast.parse(path.read_text(encoding="utf-8"))
+              for node in ast.walk(tree):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      names = [] if node.level else [(node.module or "").split(".")[0]]
+                  else:
+                      continue
+                  bad += [(str(path), n) for n in names if n and n not in allowed]
+          if bad:
+              for path, name in bad:
+                  print(f"::error file={path}::third-party import '{name}' in the zero-dependency audit core")
+              sys.exit(1)
+          print("audit core is stdlib-only")
+
+      - name: Lint
+        run: ruff check src tests
+
+      - name: Type check
+        run: mypy src/glassbox --ignore-missing-imports
+        continue-on-error: true
+
+      - name: Test
+        run: pytest --cov=src/glassbox --cov-report=term-missing --cov-fail-under=80

@@ -1,0 +1,413 @@
+{
+  "$schema": "./vendors.schema.json",
+  "generated": "2026-08-14",
+  "license": "MIT",
+  "evidence_policy": {
+    "note": "Every record carries per-field provenance. 'vendor' means the vendor's own claim and is NOT independently verified. 'public' means regulation, patent, peer-reviewed work, or reporting. 'inference' means our reasoning, labelled as such. Absence of a bias finding is not evidence of absence.",
+    "levels": ["public", "vendor", "inference", "unknown"]
+  },
+  "vendors": [
+    {
+      "id": "workday",
+      "name": "Workday Recruiting",
+      "category": "ats",
+      "tier": "enterprise-hcm",
+      "stage": "screening",
+      "measures": ["resume-jd match", "application workflow"],
+      "method": {
+        "claim": "Integrated HCM suite with resume parsing and requisition matching",
+        "evidence": "vendor"
+      },
+      "parsing_notes": {
+        "claim": "Reported to merge same-row table cell contents into a single string; multi-column layouts and non-standard section headers are reported failure modes",
+        "evidence": "public",
+        "confidence": "medium"
+      },
+      "market_position": {
+        "claim": "Leading enterprise ATS market share as of 2026",
+        "evidence": "public"
+      },
+      "litigation": [
+        {
+          "case": "Mobley v. Workday",
+          "summary": "Collective action alleging AI screening tools discriminated on age, race, and disability; court allowed ADEA collective action to proceed in 2025",
+          "evidence": "public"
+        }
+      ]
+    },
+    {
+      "id": "oracle-taleo",
+      "name": "Oracle Taleo",
+      "category": "ats",
+      "tier": "enterprise-hcm",
+      "stage": "screening",
+      "measures": ["resume-jd match", "boolean requirement filters"],
+      "method": {
+        "claim": "Legacy enterprise ATS; keyword and boolean filtering",
+        "evidence": "vendor"
+      },
+      "parsing_notes": {
+        "claim": "Reported to scramble table cell contents into unpredictable order; documented difficulty with Unicode characters, special symbols, and any layout beyond single-column",
+        "evidence": "public",
+        "confidence": "medium"
+      }
+    },
+    {
+      "id": "icims",
+      "name": "iCIMS",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["resume-jd match", "compliance workflow"],
+      "method": {
+        "claim": "Talent cloud with compliance dashboards and worker-type classification",
+        "evidence": "vendor"
+      }
+    },
+    {
+      "id": "greenhouse",
+      "name": "Greenhouse",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["structured interview scorecards", "resume-jd match"],
+      "method": {
+        "claim": "Structured-interview templates and coding-assessment APIs; parser engine upgraded 2024, Greenhouse AI launched September 2025",
+        "evidence": "vendor"
+      },
+      "parsing_notes": {
+        "claim": "Reported more tolerant of simple tables than Workday or Taleo; still fails on complex or nested tables",
+        "evidence": "public",
+        "confidence": "medium"
+      },
+      "notable": "Structured scorecards are a genuine bias-mitigation practice independent of any AI claim"
+    },
+    {
+      "id": "lever",
+      "name": "Lever",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["resume-jd match", "CRM pipeline"],
+      "method": { "claim": "ATS + candidate relationship management", "evidence": "vendor" }
+    },
+    {
+      "id": "sap-successfactors",
+      "name": "SAP SuccessFactors Recruiting",
+      "category": "ats",
+      "tier": "enterprise-hcm",
+      "stage": "screening",
+      "measures": ["resume-jd match"],
+      "method": { "claim": "HCM suite recruiting module", "evidence": "vendor" }
+    },
+    {
+      "id": "smartrecruiters",
+      "name": "SmartRecruiters",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["resume-jd match", "marketplace integrations"],
+      "method": { "claim": "Talent acquisition suite", "evidence": "vendor" }
+    },
+    {
+      "id": "bullhorn",
+      "name": "Bullhorn",
+      "category": "ats",
+      "tier": "staffing",
+      "stage": "screening",
+      "measures": ["candidate database matching"],
+      "method": { "claim": "ATS/CRM for staffing agencies", "evidence": "vendor" }
+    },
+    {
+      "id": "ashby",
+      "name": "Ashby",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["resume-jd match", "pipeline analytics"],
+      "method": { "claim": "All-in-one recruiting with analytics focus", "evidence": "vendor" }
+    },
+    {
+      "id": "jobvite",
+      "name": "Jobvite",
+      "category": "ats",
+      "tier": "specialist",
+      "stage": "screening",
+      "measures": ["resume-jd match"],
+      "method": { "claim": "Talent acquisition suite", "evidence": "vendor" }
+    },
+
+    {
+      "id": "pymetrics",
+      "name": "pymetrics (acquired by Harver, 2022)",
+      "category": "assessment",
+      "tier": "gamified",
+      "stage": "assessment",
+      "measures": [
+        "working memory", "attention", "processing speed", "risk appetite",
+        "effort allocation", "trust/reciprocity", "emotion recognition", "planning"
+      ],
+      "method": {
+        "claim": "12 browser/mobile tasks derived from peer-reviewed psychological studies; 64 features in the audited code; proprietary SVM trained on in-group (50-100 client high performers) vs out-group; fairness via search for the most predictive, least biased feature permutation, evaluated on a >10k balanced bias group; tiers at 50th and 70th percentiles; four-fifths rule enforced pre-deployment",
+        "evidence": "public",
+        "source": "Wilson et al., FAccT 2021, cooperative audit with source-code access",
+        "confidence": "high"
+      },
+      "task_paradigms": [
+        { "game": "Balloons", "paradigm": "Balloon Analogue Risk Task", "citation": "Lejuez et al. 2002" },
+        { "game": "Cards", "paradigm": "Iowa Gambling Task", "citation": "Bechara et al. 1994" },
+        { "game": "Money Exchange 1/2", "paradigm": "Trust/investment game", "citation": "Berg, Dickhaut & McCabe 1995" },
+        { "game": "Digits", "paradigm": "Digit span", "citation": "Wechsler lineage" },
+        { "game": "Stop", "paradigm": "Stop-signal task", "citation": "Logan & Cowan 1984" },
+        { "game": "Arrows", "paradigm": "Eriksen flanker / ANT", "citation": "Eriksen & Eriksen 1974; Fan et al. 2002" },
+        { "game": "Towers", "paradigm": "Tower of London", "citation": "Shallice 1982" },
+        { "game": "Easy or Hard", "paradigm": "EEfRT", "citation": "Treadway et al. 2009" },
+        { "game": "Keypresses", "paradigm": "Motor speed / tapping", "citation": "long lineage" },
+        { "game": "Lengths", "paradigm": "Perceptual discrimination", "citation": "psychophysics lineage" },
+        { "game": "Faces", "paradigm": "Emotion recognition", "citation": "Ekman lineage; Baron-Cohen 2001" }
+      ],
+      "open_source": {
+        "repo": "pymetrics/audit-ai",
+        "license": "MIT",
+        "status": "unmaintained since 2020-07-29",
+        "note": "The vendor open-sourced its adverse-impact testing framework. It is the direct predecessor of glassbox.audit."
+      },
+      "independent_audit": {
+        "exists": true,
+        "finding": "Auditors concluded the code faithfully implemented the stated four-fifths guarantee via minimum bias ratio, with adequate safeguards. They flagged that operationalising fairness AS the four-fifths rule is itself a consequential design choice.",
+        "evidence": "public"
+      }
+    },
+    {
+      "id": "arctic-shores",
+      "name": "Arctic Shores",
+      "category": "assessment",
+      "tier": "gamified",
+      "stage": "assessment",
+      "measures": ["personality", "workplace intelligence", "learning agility"],
+      "method": {
+        "claim": "Task-based behavioural assessment capturing micro-behaviour (time before action, decision sequence, hesitation, persistence, strategy evolution); machine learning over role-outcome or benchmark samples",
+        "evidence": "vendor",
+        "confidence": "low"
+      },
+      "marketing_claims_flagged": [
+        {
+          "claim": "'up to 12,000 data points' and '34 traits'",
+          "caution": "A count of recorded telemetry events is not a count of measured latent constructs. Not independently verified."
+        }
+      ]
+    },
+    {
+      "id": "hirevue",
+      "name": "HireVue",
+      "category": "assessment",
+      "tier": "video-interview",
+      "stage": "assessment",
+      "measures": ["verbal response content", "communication patterns", "game-based attention/multitasking"],
+      "method": {
+        "claim": "CNNs over audio/video and lexical features; class-normalised objective (per-class SSE) so no demographic group dominates training; 'digital fingerprinting' of protected-attribute-correlated features, projected onto unaffected candidates to test effect, followed by iterative feature ablation until adverse impact is mitigated; four-fifths penalty term in the objective",
+        "evidence": "public",
+        "source": "US 2019/0057356 A1",
+        "confidence": "high",
+        "caveat": "The patent describes methods, not necessarily the currently shipping product."
+      },
+      "history": [
+        {
+          "event": "Discontinued facial analysis in 2021 following sustained criticism",
+          "evidence": "public"
+        },
+        {
+          "event": "EPIC filed an FTC complaint in 2019 alleging unfair and deceptive practices",
+          "evidence": "public"
+        }
+      ]
+    },
+    {
+      "id": "criteria-cognify",
+      "name": "Criteria Corp (Cognify)",
+      "category": "assessment",
+      "tier": "gamified",
+      "stage": "assessment",
+      "measures": ["problem solving", "critical thinking", "verbal knowledge", "numerical reasoning"],
+      "method": {
+        "claim": "Gamified cognitive aptitude battery",
+        "evidence": "vendor"
+      }
+    },
+    {
+      "id": "shl",
+      "name": "SHL",
+      "category": "assessment",
+      "tier": "psychometric",
+      "stage": "assessment",
+      "measures": ["cognitive ability", "personality (OPQ)", "situational judgement", "behavioural"],
+      "method": {
+        "claim": "Long-established psychometric publisher; item-response-theory-based adaptive tests and validated personality inventories",
+        "evidence": "vendor",
+        "note": "Among the vendors with the deepest published psychometric literature"
+      }
+    },
+    {
+      "id": "sapia-ai",
+      "name": "Sapia.ai",
+      "category": "assessment",
+      "tier": "text-interview",
+      "stage": "assessment",
+      "measures": ["personality from free-text chat responses", "communication"],
+      "method": {
+        "claim": "NLP over structured text-based interview responses; publishes fairness reporting",
+        "evidence": "vendor"
+      }
+    },
+    {
+      "id": "plum",
+      "name": "Plum",
+      "category": "assessment",
+      "tier": "psychometric",
+      "stage": "assessment",
+      "measures": ["problem solving", "social intelligence", "personality", "role fit"],
+      "method": { "claim": "Psychometric talent matching", "evidence": "vendor" }
+    },
+    {
+      "id": "testgorilla",
+      "name": "TestGorilla",
+      "category": "assessment",
+      "tier": "skills",
+      "stage": "assessment",
+      "measures": ["role-specific skills", "cognitive ability", "personality"],
+      "method": { "claim": "Library of skills tests composed into assessments", "evidence": "vendor" }
+    },
+    {
+      "id": "codility",
+      "name": "Codility",
+      "category": "assessment",
+      "tier": "technical",
+      "stage": "assessment",
+      "measures": ["programming correctness", "algorithmic efficiency", "code quality"],
+      "method": {
+        "claim": "Automated test-case execution against submitted code, with complexity analysis",
+        "evidence": "vendor",
+        "note": "Directly job-sample-based, which is the strongest validity footing of any category here"
+      }
+    },
+    {
+      "id": "hackerrank",
+      "name": "HackerRank",
+      "category": "assessment",
+      "tier": "technical",
+      "stage": "assessment",
+      "measures": ["programming correctness", "problem solving"],
+      "method": { "claim": "Automated coding assessment and interview platform", "evidence": "vendor" }
+    },
+    {
+      "id": "harver",
+      "name": "Harver",
+      "category": "assessment",
+      "tier": "multi-method",
+      "stage": "assessment",
+      "measures": ["situational judgement", "cognitive", "behavioural"],
+      "method": {
+        "claim": "Volume-hiring assessment suite; acquired pymetrics in 2022",
+        "evidence": "vendor"
+      }
+    },
+    {
+      "id": "modern-hire",
+      "name": "Modern Hire (acquired by HireVue, 2023)",
+      "category": "assessment",
+      "tier": "video-interview",
+      "stage": "assessment",
+      "measures": ["interview responses", "job-fit scoring"],
+      "method": { "claim": "Interview scoring and virtual job tryouts", "evidence": "vendor" }
+    },
+    {
+      "id": "mettl",
+      "name": "Mercer | Mettl",
+      "category": "assessment",
+      "tier": "multi-method",
+      "stage": "assessment",
+      "measures": ["cognitive", "technical skills", "personality"],
+      "method": { "claim": "Assessment platform with proctoring", "evidence": "vendor" }
+    },
+    {
+      "id": "revelian",
+      "name": "Revelian (Criteria)",
+      "category": "assessment",
+      "tier": "gamified",
+      "stage": "assessment",
+      "measures": ["cognitive ability", "emotional intelligence", "personality"],
+      "method": { "claim": "Game-based cognitive and behavioural assessment", "evidence": "vendor" }
+    }
+  ],
+  "regulations": [
+    {
+      "id": "eeoc-ugesp",
+      "name": "EEOC Uniform Guidelines on Employee Selection Procedures",
+      "citation": "29 CFR Part 1607",
+      "jurisdiction": "US federal",
+      "status": "in force since 1978",
+      "key_obligations": [
+        "Four-fifths rule as screening standard for adverse impact (1607.4(D))",
+        "Validity evidence required for procedures that produce adverse impact (1607.14)",
+        "Criterion-related validity requires significance at p <= 0.05"
+      ],
+      "url": "https://www.ecfr.gov/current/title-29/subtitle-B/chapter-XIV/part-1607"
+    },
+    {
+      "id": "nyc-ll144",
+      "name": "NYC Local Law 144 of 2021 (AEDT)",
+      "jurisdiction": "New York City",
+      "status": "in force",
+      "key_obligations": [
+        "Annual independent bias audit of automated employment decision tools",
+        "Public posting of selection rates and impact ratios",
+        "Impact ratios required for sex, race/ethnicity, AND intersectional categories",
+        "Candidate notice",
+        "Categories under 2% of data may be excluded from calculations"
+      ],
+      "penalties": "Up to $1,500 per day per violation",
+      "url": "https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-2/"
+    },
+    {
+      "id": "illinois-hb3773",
+      "name": "Illinois HB 3773 (Human Rights Act amendment)",
+      "jurisdiction": "Illinois",
+      "status": "effective 2026-01-01",
+      "key_obligations": [
+        "Prohibits AI that discriminates on protected classes in employment decisions",
+        "Notice required when AI is used in hiring, promotion, discharge, or discipline"
+      ],
+      "note": "No impact assessment mandated, unlike the original Colorado approach"
+    },
+    {
+      "id": "colorado-ai",
+      "name": "Colorado AI Act",
+      "jurisdiction": "Colorado",
+      "status": "SB 24-205 REPEALED before taking effect; replaced by SB 26-189 signed 2026-05-14, effective 2027-01-01",
+      "key_obligations": [
+        "Replacement requires disclosure and human review",
+        "Risk-management programmes, annual impact assessments, and duty of care from the original act were removed"
+      ],
+      "warning": "Many published compliance guides still describe the repealed SB 24-205 obligations. Verify before relying on any source describing Colorado requirements."
+    },
+    {
+      "id": "eu-ai-act",
+      "name": "EU AI Act",
+      "jurisdiction": "European Union",
+      "status": "Annex III high-risk obligations DEFERRED to 2027-12-02 by the Digital Omnibus (in force 2026-07-27), from the original 2026-08-02",
+      "key_obligations": [
+        "Employment AI classified as high-risk (recruitment, selection, evaluation, promotion, termination)",
+        "Risk management, data governance, logging, human oversight, conformity assessment"
+      ]
+    },
+    {
+      "id": "california-feha-ads",
+      "name": "California FEHA automated-decision-system regulations",
+      "jurisdiction": "California",
+      "status": "finalised 2025-26",
+      "key_obligations": [
+        "Automated-decision-system discrimination rules under state employment law"
+      ]
+    }
+  ]
+}

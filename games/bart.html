@@ -1,0 +1,267 @@
+<meta charset="utf-8">
+<title>BART — Balloon Analogue Risk Task</title>
+<!--
+  Balloon Analogue Risk Task — a faithful, dependency-free implementation of the
+  paradigm described in:
+
+    Lejuez, C. W., Read, J. P., Kahler, C. W., Richards, J. B., Ramsey, S. E.,
+    Stuart, G. L., Strong, D. R., & Brown, R. A. (2002). Evaluation of a behavioral
+    measure of risk taking: The Balloon Analogue Risk Task (BART).
+    Journal of Experimental Psychology: Applied, 8(2), 75-84.
+
+  This is a reference implementation of the PUBLISHED paradigm. It is not a clone of
+  any commercial product's art, interface, or scoring model. The scientific method
+  here has been in the open literature since 2002.
+
+  Key fidelity detail: burst points are drawn WITHOUT replacement from an array of
+  1..MAX_PUMPS, which makes the probability of bursting on pump k exactly 1/(N-k+1).
+  That uniform-hazard construction is what the original paper specifies; sampling a
+  burst point independently per balloon gives different risk dynamics and is the most
+  common way implementations get this wrong.
+
+  Data stays in the browser. Nothing is transmitted anywhere. Export the JSON and
+  score it with glassbox.psych.tasks.bart_score.
+-->
+<style>
+  :root {
+    --bg: #ffffff; --fg: #14161a; --muted: #5c6270; --line: #d8dce4;
+    --accent: #b23a48; --accent-fg: #ffffff; --ok: #1f7a4d; --panel: #f6f7f9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14161a; --fg: #e8eaee; --muted: #9aa1ad; --line: #2c313a;
+      --accent: #d9606f; --accent-fg: #14161a; --ok: #4ec98a; --panel: #1b1e24;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 2rem 1rem; background: var(--bg); color: var(--fg);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; align-items: center; min-height: 100vh;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  .sub { color: var(--muted); font-size: .875rem; margin-bottom: 1.5rem; text-align: center; }
+  .stage {
+    width: min(560px, 100%); border: 1px solid var(--line); border-radius: 12px;
+    padding: 1.5rem; background: var(--panel);
+  }
+  .stats { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; margin-bottom: 1rem; font-size: .875rem; }
+  .stats b { display: block; font-size: 1.25rem; font-weight: 600; }
+  .stats span { color: var(--muted); }
+  .balloon-area { height: 260px; display: flex; align-items: center; justify-content: center; }
+  .balloon {
+    background: var(--accent); border-radius: 50% 50% 45% 45%;
+    transition: width .12s ease, height .12s ease;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent-fg); font-weight: 600; font-variant-numeric: tabular-nums;
+  }
+  .controls { display: flex; gap: .75rem; margin-top: 1rem; }
+  button {
+    flex: 1; padding: .75rem 1rem; font: inherit; font-weight: 600; cursor: pointer;
+    border-radius: 8px; border: 1px solid var(--line); background: var(--bg); color: var(--fg);
+  }
+  button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  .msg { text-align: center; min-height: 1.5rem; margin-top: .75rem; font-weight: 600; }
+  .msg.burst { color: var(--accent); }
+  .msg.banked { color: var(--ok); }
+  pre {
+    width: min(560px, 100%); margin-top: 1.5rem; padding: 1rem; overflow-x: auto;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    font-size: .8125rem; max-height: 320px;
+  }
+  .note { width: min(560px, 100%); color: var(--muted); font-size: .8125rem; margin-top: 1.5rem; }
+  a { color: inherit; }
+</style>
+
+<h1>Balloon Analogue Risk Task</h1>
+<p class="sub">
+  Pump to earn. Bank to keep. A burst balloon pays nothing.<br>
+  Reference implementation of Lejuez et al. (2002). Data stays in your browser.
+</p>
+
+<div class="stage">
+  <div class="stats">
+    <div><span>Balloon</span><b id="trial">1 / 30</b></div>
+    <div><span>This balloon</span><b id="pending">0</b></div>
+    <div><span>Banked</span><b id="banked">0</b></div>
+  </div>
+
+  <div class="balloon-area">
+    <div class="balloon" id="balloon" style="width:60px;height:70px">0</div>
+  </div>
+
+  <div class="controls">
+    <button class="primary" id="pump">Pump</button>
+    <button id="bank">Bank</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+</div>
+
+<pre id="output" hidden></pre>
+
+<p class="note">
+  Score the exported JSON with <code>glassbox.psych.tasks.bart_score</code>, which
+  reports adjusted average pumps (unexploded balloons only) — the measure the source
+  paper defines. This is a research instrument, not a validated selection procedure.
+</p>
+
+<script>
+(() => {
+  "use strict";
+
+  const N_BALLOONS = 30;
+  const MAX_PUMPS = 128;      // Lejuez et al. use 128 for the standard version.
+  const POINTS_PER_PUMP = 5;
+
+  const el = {
+    trial: document.getElementById("trial"),
+    pending: document.getElementById("pending"),
+    banked: document.getElementById("banked"),
+    balloon: document.getElementById("balloon"),
+    pump: document.getElementById("pump"),
+    bank: document.getElementById("bank"),
+    msg: document.getElementById("msg"),
+    output: document.getElementById("output"),
+  };
+
+  const state = {
+    trial: 0,
+    pumps: 0,
+    banked: 0,
+    burstAt: 0,
+    trialStart: 0,
+    pumpTimes: [],
+    trials: [],
+    finished: false,
+  };
+
+  /**
+   * Draw burst points without replacement from 1..MAX_PUMPS.
+   *
+   * This is the fidelity-critical detail. With a shuffled array consumed one balloon
+   * at a time, the probability of bursting on pump k given survival to k is exactly
+   * 1/(MAX_PUMPS - k + 1) — the uniform hazard the paradigm specifies. Drawing an
+   * independent burst point per balloon produces a different (and wrong) hazard.
+   */
+  const burstPoints = (() => {
+    const points = Array.from({ length: MAX_PUMPS }, (_, i) => i + 1);
+    for (let i = points.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [points[i], points[j]] = [points[j], points[i]];
+    }
+    return points;
+  })();
+
+  function startTrial() {
+    state.pumps = 0;
+    state.pumpTimes = [];
+    state.trialStart = performance.now();
+    state.burstAt = burstPoints[state.trial % burstPoints.length];
+    render();
+    el.pump.disabled = false;
+    el.bank.disabled = false;
+  }
+
+  function render() {
+    el.trial.textContent = `${Math.min(state.trial + 1, N_BALLOONS)} / ${N_BALLOONS}`;
+    el.pending.textContent = state.pumps * POINTS_PER_PUMP;
+    el.banked.textContent = state.banked;
+    const size = 60 + state.pumps * 4;
+    el.balloon.style.width = `${size}px`;
+    el.balloon.style.height = `${size + 10}px`;
+    el.balloon.textContent = state.pumps;
+  }
+
+  function recordTrial(exploded) {
+    state.trials.push({
+      trial_index: state.trial,
+      pumps: state.pumps,
+      exploded,
+      burst_point: state.burstAt,
+      earned: exploded ? 0 : state.pumps * POINTS_PER_PUMP,
+      trial_duration_ms: Math.round(performance.now() - state.trialStart),
+      pump_latencies_ms: state.pumpTimes,
+    });
+  }
+
+  function endTrial(exploded, message, cssClass) {
+    recordTrial(exploded);
+    el.pump.disabled = true;
+    el.bank.disabled = true;
+    el.msg.textContent = message;
+    el.msg.className = `msg ${cssClass}`;
+
+    state.trial += 1;
+    if (state.trial >= N_BALLOONS) {
+      finish();
+      return;
+    }
+    setTimeout(() => {
+      el.msg.textContent = "";
+      el.msg.className = "msg";
+      startTrial();
+    }, 1100);
+  }
+
+  function finish() {
+    state.finished = true;
+    el.balloon.style.display = "none";
+    el.msg.textContent = `Complete — ${state.banked} points banked.`;
+    el.msg.className = "msg banked";
+
+    const unexploded = state.trials.filter((t) => !t.exploded);
+    const payload = {
+      task: "BART",
+      paradigm: "Lejuez et al. (2002), Journal of Experimental Psychology: Applied, 8(2), 75-84",
+      implementation: "glassbox-hiring/games/bart.html",
+      completed_at: new Date().toISOString(),
+      parameters: {
+        n_balloons: N_BALLOONS,
+        max_pumps: MAX_PUMPS,
+        points_per_pump: POINTS_PER_PUMP,
+        burst_sampling: "without replacement from 1..max_pumps",
+      },
+      total_banked: state.banked,
+      adjusted_pumps: unexploded.length
+        ? unexploded.reduce((sum, t) => sum + t.pumps, 0) / unexploded.length
+        : null,
+      trials: state.trials,
+    };
+
+    el.output.hidden = false;
+    el.output.textContent = JSON.stringify(payload, null, 2);
+    el.pump.textContent = "Copy JSON";
+    el.pump.disabled = false;
+    el.bank.hidden = true;
+    el.pump.onclick = () => {
+      navigator.clipboard?.writeText(JSON.stringify(payload, null, 2));
+      el.pump.textContent = "Copied";
+    };
+  }
+
+  el.pump.addEventListener("click", () => {
+    if (state.finished) return;
+    state.pumpTimes.push(Math.round(performance.now() - state.trialStart));
+    state.pumps += 1;
+
+    if (state.pumps >= state.burstAt) {
+      render();
+      endTrial(true, "Burst — 0 points from this balloon.", "burst");
+      return;
+    }
+    render();
+  });
+
+  el.bank.addEventListener("click", () => {
+    if (state.finished) return;
+    const earned = state.pumps * POINTS_PER_PUMP;
+    state.banked += earned;
+    render();
+    endTrial(false, `Banked ${earned} points.`, "banked");
+  });
+
+  startTrial();
+})();
+</script>
