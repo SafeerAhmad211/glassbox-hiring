@@ -4,7 +4,11 @@ build-backend = "hatchling.build"
 
 [project]
 name = "glassbox-hiring"
-version = "0.1.2"
+# Single-sourced from src/glassbox/__init__.py -- see [tool.hatch.version].
+# Keeping it in two places meant every release depended on remembering to bump
+# both, and a mismatch produces a wheel whose metadata disagrees with the
+# module it installs.
+dynamic = ["version"]
 description = "Open, auditable implementations of the algorithms behind ATS resume screening and gamified hiring assessment."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -50,6 +54,9 @@ scrape = [
 ]
 dev = [
     "pytest>=8.0",
+    # Required by tests/test_packaging.py to assert the release workflow's security
+    # properties. Without it those tests skip, and a regression ships unnoticed.
+    "pyyaml>=6.0",
     # scipy is NOT a runtime dependency -- the audit core stays stdlib-only. It is
     # used solely as an independent reference implementation in differential tests.
     "scipy>=1.11",
@@ -68,8 +75,32 @@ Methodology = "https://github.com/SafeerAhmad211/glassbox-hiring/blob/main/resea
 [project.scripts]
 glassbox = "glassbox.cli:main"
 
+[tool.hatch.version]
+path = "src/glassbox/__init__.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/glassbox"]
+
+[tool.hatch.build.targets.sdist]
+# Ship what a downstream packager needs to build and verify the project: sources,
+# tests, examples, and the research the code is grounded in.
+include = [
+    "/src",
+    "/tests",
+    "/examples",
+    "/games",
+    "/data",
+    "/research",
+    "/CHANGELOG.md",
+    "/CONTRIBUTING.md",
+]
+# graphify-out/ is a generated documentation artifact -- graph.html alone is 824 KB,
+# four times the rest of the sdist combined. It is regenerable from the source and
+# belongs in the repository, not in a distribution people download to install.
+exclude = [
+    "/graphify-out",
+    "/dist_check",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

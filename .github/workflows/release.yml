@@ -1,0 +1,251 @@
+name: release
+
+# Publishes to PyPI using Trusted Publishing (OIDC). There is no API token stored in
+# this repository, and there is nothing to leak or rotate: PyPI mints a short-lived
+# credential for a specific workflow in a specific repository and environment.
+#
+# The job layout follows the PyPA security guidance:
+#
+#   build  ->  verify  ->  publish
+#
+# Building is separated from publishing so that anything injected into the build or
+# test environment cannot reach the publishing credential -- only the `publish-*` jobs
+# hold `id-token: write`, and they do nothing except upload an already-built artifact.
+# The GitHub environment binding matters too: without it, a step with `actions: write`
+# could dispatch this workflow and still satisfy the repository and workflow claims.
+#
+# ---------------------------------------------------------------------------------
+# ONE-TIME SETUP (must be done in the PyPI and GitHub web UIs; a workflow cannot do it)
+#
+#   1. PyPI -> Your projects -> Publishing -> Add a pending publisher
+#        Owner:        SafeerAhmad211
+#        Repository:   glassbox-hiring
+#        Workflow:     release.yml
+#        Environment:  pypi
+#      Repeat at https://test.pypi.org with environment `testpypi`.
+#
+#   2. GitHub -> Settings -> Environments -> create `pypi` and `testpypi`.
+#      Add a required reviewer on `pypi` so a real release cannot happen unattended.
+#
+# Then: dry-run to TestPyPI with `workflow_dispatch`, and publish for real by
+# publishing a GitHub Release whose tag is `v<version>` (e.g. `v0.1.2`).
+# ---------------------------------------------------------------------------------
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Where to publish"
+        required: true
+        default: testpypi
+        type: choice
+        options: [testpypi, none]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distributions
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build tooling
+        run: python -m pip install --upgrade build twine
+
+      - name: Build sdist and wheel
+        run: python -m build
+
+      - name: Read the package version
+        id: version
+        run: |
+          version=$(python -c "
+          import tomllib, pathlib, re
+          # Version is single-sourced in src/glassbox/__init__.py via hatch.
+          text = pathlib.Path('src/glassbox/__init__.py').read_text(encoding='utf-8')
+          print(re.search(r'__version__ = \"([^\"]+)\"', text).group(1))
+          ")
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Package version: $version"
+
+      - name: Check the release tag matches the package version
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Tagging v0.2.0 without bumping __version__ would publish 0.1.2 under a
+          # 0.2.0 release. PyPI never lets a version be reused, so this is not
+          # recoverable after the fact -- it has to fail here.
+          if [ "${TAG#v}" != "$VERSION" ]; then
+            echo "::error::Tag '$TAG' does not match package version '$VERSION'."
+            echo "::error::Bump __version__ in src/glassbox/__init__.py, or retag."
+            exit 1
+          fi
+          echo "Tag $TAG matches package version $VERSION"
+
+      - name: Check that this version is not already on PyPI
+        if: github.event_name == 'release'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          # Fail early with a clear message rather than at the upload step.
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            "https://pypi.org/pypi/glassbox-hiring/$VERSION/json")
+          if [ "$code" = "200" ]; then
+            echo "::error::glassbox-hiring $VERSION is already on PyPI. Versions cannot be reused."
+            exit 1
+          fi
+          echo "Version $VERSION is not yet published (HTTP $code)"
+
+      - name: Validate metadata
+        run: python -m twine check --strict dist/*
+
+      - name: Show what will be published
+        run: |
+          ls -la dist/
+          echo "--- wheel contents ---"
+          python -c "
+          import zipfile, glob
+          names = zipfile.ZipFile(glob.glob('dist/*.whl')[0]).namelist()
+          print('\n'.join(sorted(names)))
+          "
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+          if-no-files-found: error
+
+  verify:
+    name: Verify wheel (${{ matrix.os }}, py${{ matrix.python-version }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.10", "3.13"]
+
+    steps:
+      # Deliberately no checkout: this job must exercise the built artifact alone,
+      # not the source tree. A data file missing from the wheel is invisible to any
+      # test run against a git checkout -- which is exactly how vendors.json could
+      # have gone missing without a single test failing.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - name: Install the wheel
+        shell: bash
+        # Quoted: the colons in `--only-binary=:all:` would otherwise be read as a
+        # YAML mapping and the workflow would not parse.
+        run: "python -m pip install --only-binary=:all: dist/*.whl"
+
+      - name: Confirm the install has no third-party dependencies
+        shell: bash
+        run: |
+          # The zero-dependency guarantee is the reason this library is expected to
+          # still run in ten years. Assert it against the installed distribution.
+          extra=$(python -m pip list --format=freeze \
+            | grep -viE "^(pip|setuptools|wheel|glassbox)" || true)
+          if [ -n "$extra" ]; then
+            echo "::error::Base install pulled third-party packages:"
+            echo "$extra"
+            exit 1
+          fi
+          echo "Zero third-party dependencies confirmed"
+
+      - name: Smoke-test the installed package
+        shell: bash
+        run: |
+          python - <<'PY'
+          from glassbox import __version__
+          from glassbox.audit import adverse_impact
+          from glassbox.audit.stats import fisher_exact_2x2
+          from glassbox.atlas import regulations, vendors
+
+          report = adverse_impact({"A": (80, 100), "B": (40, 100)})
+          assert report.min_impact_ratio == 0.5, report.min_impact_ratio
+          assert not report.passes_four_fifths
+
+          # Fisher's tea tasting, the canonical reference value.
+          assert abs(fisher_exact_2x2(3, 1, 1, 3).p_value - 0.4857142857142857) < 1e-12
+
+          # Reads the packaged data file; fails loudly if it was left out of the wheel.
+          assert len(vendors()) > 20, "vendor atlas missing or truncated"
+          assert any(r["id"] == "nyc-ll144" for r in regulations())
+
+          print(f"glassbox-hiring {__version__} verified from the wheel")
+          PY
+
+      - name: Smoke-test the console entry point
+        shell: bash
+        run: |
+          glassbox tools > /dev/null
+          glassbox atlas --regulations > /dev/null
+          printf 'group,selected,total\nA,80,100\nB,40,100\n' > counts.csv
+          # Exit code 1 is the documented "finding" status, not a failure.
+          glassbox audit counts.csv && code=0 || code=$?
+          if [ "$code" != "1" ]; then
+            echo "::error::expected exit 1 (finding) from the audit, got $code"
+            exit 1
+          fi
+          echo "CLI verified"
+
+  publish-testpypi:
+    name: Publish to TestPyPI
+    needs: verify
+    if: github.event_name == 'workflow_dispatch' && inputs.target == 'testpypi'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/glassbox-hiring
+    permissions:
+      id-token: write # the only privilege this job holds, and only for OIDC
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # TestPyPI accumulates dry runs; do not fail a rehearsal on a collision.
+          skip-existing: true
+
+  publish-pypi:
+    name: Publish to PyPI
+    needs: verify
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/glassbox-hiring
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: distributions
+          path: dist/
+
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        # Trusted Publishing also produces PEP 740 attestations, so anyone can verify
+        # these files were built by this workflow in this repository. No `with:`
+        # credentials -- omitting username/password is what selects OIDC.

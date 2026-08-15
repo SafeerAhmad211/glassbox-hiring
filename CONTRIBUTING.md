@@ -93,6 +93,63 @@ Add to the `regulations` array in `data/vendors.json` with `id`, `name`,
 widely-cited source is now wrong, add a `warning` field — that field exists because
 much published guidance still describes the repealed Colorado act.
 
+## Releasing
+
+Publishing uses [PyPI Trusted Publishing](https://docs.pypi.org/trusted-publishers/)
+via [`.github/workflows/release.yml`](.github/workflows/release.yml). There is no API
+token in this repository — PyPI mints a short-lived credential for this specific
+workflow, in this repository, in a named environment. Nothing to leak, nothing to
+rotate.
+
+### One-time setup
+
+These steps happen in the PyPI and GitHub web UIs; a workflow cannot perform them.
+
+1. **PyPI** → *Your projects* → *Publishing* → *Add a pending publisher*:
+
+   | Field | Value |
+   |---|---|
+   | Owner | `SafeerAhmad211` |
+   | Repository | `glassbox-hiring` |
+   | Workflow | `release.yml` |
+   | Environment | `pypi` |
+
+   Repeat on [test.pypi.org](https://test.pypi.org) with environment `testpypi`.
+
+2. **GitHub** → *Settings* → *Environments* → create `pypi` and `testpypi`. Add a
+   required reviewer on `pypi` so a real upload cannot happen unattended.
+
+### Cutting a release
+
+1. Bump `__version__` in `src/glassbox/__init__.py`. That is the **only** place a
+   version is written — `pyproject.toml` reads it via `[tool.hatch.version]`, so the
+   two can no longer disagree.
+2. Add a `CHANGELOG.md` entry.
+3. Rehearse: *Actions* → *release* → *Run workflow* → target `testpypi`. This builds,
+   verifies, and uploads to TestPyPI without touching the real index.
+4. Publish a GitHub Release tagged `v<version>` (e.g. `v0.2.0`). That triggers the
+   PyPI upload.
+
+### What the workflow checks before uploading
+
+PyPI never allows a version to be reused, so every check runs *before* the upload
+step rather than after it:
+
+- the release tag matches the package version — tagging `v0.2.0` without bumping
+  `__version__` would otherwise publish `0.1.2` under a `0.2.0` release, permanently;
+- the version is not already on PyPI;
+- `twine check --strict` passes on both distributions;
+- the **wheel** installs and works on Linux, macOS, and Windows across Python 3.10
+  and 3.13 — with no checkout, so a data file missing from the wheel is caught. A
+  test suite run against a git checkout cannot see that class of bug at all;
+- the installed package still pulls **zero** third-party dependencies;
+- the console entry point runs and returns its documented exit codes.
+
+`tests/test_packaging.py` asserts the workflow's security properties — that only the
+publishing jobs hold `id-token: write`, that they are environment-bound, that they
+never check out source, and that no credentials are configured — so those cannot
+regress unnoticed.
+
 ## Reporting issues
 
 Especially valuable:

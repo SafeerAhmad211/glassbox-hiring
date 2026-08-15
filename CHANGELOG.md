@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- **PyPI release workflow** (`.github/workflows/release.yml`) using Trusted Publishing
+  (OIDC). No API token is stored in the repository. Building is separated from
+  publishing, only the publish jobs hold `id-token: write`, and both are bound to a
+  GitHub environment. See CONTRIBUTING.md for the one-time PyPI/GitHub setup.
+- The workflow verifies the built **wheel** on Linux, macOS, and Windows across Python
+  3.10 and 3.13 with no source checkout — the only way to catch a data file missing
+  from the distribution, which a test run against a git checkout cannot see.
+- `tests/test_packaging.py` — asserts packaging invariants and the workflow's security
+  properties, so neither can regress silently.
+
+### Changed
+
+- **The version is now single-sourced** from `src/glassbox/__init__.py` via
+  `[tool.hatch.version]`. It was previously declared in both that file and
+  `pyproject.toml`, so every release depended on remembering to bump both; a mismatch
+  ships a wheel whose metadata disagrees with the module it installs, and PyPI never
+  allows a version to be reused.
+- The sdist no longer ships `graphify-out/`. `graph.html` alone was 824 KB — four
+  times the rest of the distribution — and is regenerable. Sdist: 198 KB → 129 KB.
+
 ## 0.1.2 — 2026-08-15
 
 ### Added
