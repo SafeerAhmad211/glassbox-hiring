@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "glassbox-hiring"
-version = "0.1.0"
+version = "0.1.1"
 description = "Open, auditable implementations of the algorithms behind ATS resume screening and gamified hiring assessment."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -50,6 +50,9 @@ scrape = [
 ]
 dev = [
     "pytest>=8.0",
+    # scipy is NOT a runtime dependency -- the audit core stays stdlib-only. It is
+    # used solely as an independent reference implementation in differential tests.
+    "scipy>=1.11",
     "pytest-cov>=5.0",
     "ruff>=0.6",
     "mypy>=1.11",

@@ -197,6 +197,12 @@ def adverse_impact(
     Raises:
         ValueError: If fewer than two groups have data.
     """
+    if not 0.0 <= min_share < 1.0:
+        # A negative share silently excludes nothing; a share >= 1 silently excludes
+        # everything and then surfaces as a confusing "need at least 2 groups" error
+        # far from the actual mistake.
+        raise ValueError(f"min_share must be in [0, 1), got {min_share}")
+
     if isinstance(outcomes, Mapping):
         outcomes = [
             GroupOutcome(name, selected, total)

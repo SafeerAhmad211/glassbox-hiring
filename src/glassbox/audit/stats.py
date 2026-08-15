@@ -107,34 +107,212 @@ def fisher_exact_2x2(a: int, b: int, c: int, d: int) -> TestResult:
             None, 1.0, "Fisher's exact (two-sided)", "degenerate table: a margin is zero"
         )
 
-    def table_prob(a_val: int) -> float:
-        """Hypergeometric probability of the table with this focal-selected count."""
-        return (
-            math.comb(row1, a_val)
-            * math.comb(row2, col1 - a_val)
-            / math.comb(n, col1)
-        )
-
     # Support of a: bounded by both its row total and the column total.
     lo = max(0, col1 - row2)
     hi = min(row1, col1)
+
+    # Two implementations, same test. Small tables enumerate the support with exact
+    # integer arithmetic. Large tables cannot: the support can span millions of
+    # values, math.comb on operands that size produces enormous integers, and naive
+    # enumeration takes minutes to never. Employment data reaches that size easily --
+    # 20,000 applicants with one selection in a group routes here, because the
+    # small-cell rule that selects this test says nothing about total n.
+    if hi - lo <= _EXACT_ENUMERATION_LIMIT and n <= _EXACT_TOTAL_LIMIT:
+        p = _fisher_exact_enumerate(a, row1, row2, col1, n, lo, hi)
+        method = f"exact conditional test, n={n}; chosen because a cell count is small"
+    else:
+        p = _fisher_exact_logspace(a, row1, row2, col1, n, lo, hi)
+        method = (
+            f"exact conditional test in log space, n={n}; chosen because a cell "
+            "count is small and the support is too large to enumerate"
+        )
+
+    return TestResult(None, min(1.0, p), "Fisher's exact (two-sided)", method)
+
+
+#: Support sizes at or below this are enumerated with exact integer arithmetic.
+_EXACT_ENUMERATION_LIMIT = 4096
+
+#: ...but only when the grand total is also modest. ``math.comb`` cost grows with n
+#: independently of support width, so a narrow support over a large table is still
+#: slow: n=6000 with a 2000-wide support took 1.4 seconds before this bound existed.
+#: Both conditions must hold to take the exact path.
+_EXACT_TOTAL_LIMIT = 5000
+
+
+def _fisher_exact_enumerate(
+    a: int, row1: int, row2: int, col1: int, n: int, lo: int, hi: int
+) -> float:
+    """Exact integer enumeration of the hypergeometric support.
+
+    Exact to the last bit for small tables, which is why it is kept rather than
+    using log space everywhere.
+    """
+
+    def table_prob(a_val: int) -> float:
+        return math.comb(row1, a_val) * math.comb(row2, col1 - a_val) / math.comb(n, col1)
 
     observed = table_prob(a)
     # Relative tolerance guards against float noise excluding a table that is
     # mathematically equally-or-less probable.
     tolerance = observed * 1e-9
-    p = sum(
+    return sum(
         prob
         for a_val in range(lo, hi + 1)
         if (prob := table_prob(a_val)) <= observed + tolerance
     )
 
-    return TestResult(
-        None,
-        min(1.0, p),
-        "Fisher's exact (two-sided)",
-        f"exact conditional test, n={n}; chosen because a cell count is small",
+
+def _log_hypergeom_pmf(a_val: int, row1: int, row2: int, col1: int, n: int) -> float:
+    """Log probability of the table with ``a_val`` focal selections.
+
+    Uses ``math.lgamma`` so no intermediate integer is ever materialised. This both
+    avoids the cost of huge-integer binomials and prevents the underflow that makes
+    a very small p-value collapse to exactly 0.0 in the enumerated path.
+    """
+
+    def log_choose(top: int, k: int) -> float:
+        if k < 0 or k > top:
+            return -math.inf
+        return (
+            math.lgamma(top + 1) - math.lgamma(k + 1) - math.lgamma(top - k + 1)
+        )
+
+    return (
+        log_choose(row1, a_val)
+        + log_choose(row2, col1 - a_val)
+        - log_choose(n, col1)
     )
+
+
+def _fisher_exact_logspace(
+    a: int, row1: int, row2: int, col1: int, n: int, lo: int, hi: int
+) -> float:
+    """Two-sided Fisher p-value for large tables, without enumerating the support.
+
+    The hypergeometric PMF is unimodal, so the set of tables at least as extreme as
+    the observed one is a union of at most two tails. We locate each tail's boundary
+    by binary search (valid because the PMF is monotone either side of the mode) and
+    sum inward-to-outward, stopping once terms stop contributing. Tails decay
+    geometrically, so a few hundred terms suffice regardless of how wide the support
+    is.
+    """
+    log_pmf = lambda k: _log_hypergeom_pmf(k, row1, row2, col1, n)  # noqa: E731
+
+    log_observed = log_pmf(a)
+    if log_observed == -math.inf:
+        return 1.0
+
+    # Mode of the hypergeometric distribution.
+    mode = min(hi, max(lo, ((row1 + 1) * (col1 + 1)) // (n + 2)))
+
+    # Relative tolerance in log space, mirroring the enumerated path's 1e-9.
+    threshold = log_observed + 1e-9
+
+    def sum_tail(start: int, step: int) -> float:
+        """Sum the PMF from ``start`` outward until the remaining tail is negligible.
+
+        Terms decay monotonically away from the mode, and in the tail the decay is
+        geometric. Once two consecutive terms give a ratio ``r < 1``, the entire
+        remaining tail is bounded above by ``term * r / (1 - r)``, so we can stop as
+        soon as that *bound* is negligible rather than waiting for individual terms
+        to shrink.
+
+        The difference is not cosmetic. A plain per-term threshold made this walk
+        thousands of values on wide supports -- runtime grew linearly with n,
+        reaching 1.4 seconds at n = 8,000,000. With the bound it is flat.
+        """
+        total = 0.0
+        previous: float | None = None
+        k = start
+        while lo <= k <= hi:
+            term = math.exp(log_pmf(k))
+            total += term
+
+            if term == 0.0:
+                # Underflowed below the smallest representable double. Terms decrease
+                # monotonically away from the mode, so every remaining one is zero
+                # too and the walk is finished.
+                #
+                # This must not be conditioned on the running total being positive.
+                # When a tail begins already underflowed -- routine for extreme
+                # tables, where log-probabilities reach -100,000 -- every term is
+                # zero, so a `total > 0` guard never fires and the walk runs the full
+                # width of the support. That was the entire source of this function's
+                # linear scaling.
+                break
+
+            if previous is not None and term < previous:
+                ratio = term / previous
+                if ratio < 1.0:
+                    # In the tail the decay is geometric, so the whole remaining tail
+                    # is bounded by term * r / (1 - r). Stop once that bound is
+                    # negligible rather than waiting for individual terms to vanish.
+                    remaining_bound = term * ratio / (1.0 - ratio)
+                    if remaining_bound <= total * 1e-15:
+                        break
+
+            previous = term
+            k += step
+        return total
+
+    def rightmost_qualifying_left_of_mode() -> int | None:
+        """Largest k in [lo, mode] with log_pmf(k) <= threshold.
+
+        The PMF *increases* across this range, so qualifying values form the prefix
+        [lo, k*] and we need its right end. Searching for the smallest qualifying k
+        instead returns ``lo`` and sums a single term, undercounting the tail --
+        which is exactly the bug this replaced.
+        """
+        low, high, best = lo, mode, None
+        while low <= high:
+            mid = (low + high) // 2
+            if log_pmf(mid) <= threshold:
+                best = mid
+                low = mid + 1
+            else:
+                high = mid - 1
+        return best
+
+    def leftmost_qualifying_right_of_mode() -> int | None:
+        """Smallest k in [mode, hi] with log_pmf(k) <= threshold.
+
+        The PMF *decreases* across this range, so qualifying values form the suffix
+        [k*, hi] and we need its left end.
+        """
+        low, high, best = mode, hi, None
+        while low <= high:
+            mid = (low + high) // 2
+            if log_pmf(mid) <= threshold:
+                best = mid
+                high = mid - 1
+            else:
+                low = mid + 1
+        return best
+
+    # Each branch sums the near side inclusive of the observed value, then adds the
+    # far side clamped away from it. The clamp is what prevents double-counting when
+    # the two qualifying regions meet or overlap -- which happens whenever the
+    # observed table sits at or near the mode, where every table qualifies and the
+    # answer must come out at 1.0.
+    if a <= mode:
+        # PMF increases towards the mode, so [lo, a] all qualify.
+        p = sum_tail(a, -1)
+        boundary = leftmost_qualifying_right_of_mode()
+        if boundary is not None:
+            start = max(boundary, a + 1)
+            if start <= hi:
+                p += sum_tail(start, +1)
+    else:
+        # PMF decreases away from the mode, so [a, hi] all qualify.
+        p = sum_tail(a, +1)
+        boundary = rightmost_qualifying_left_of_mode()
+        if boundary is not None:
+            start = min(boundary, a - 1)
+            if start >= lo:
+                p += sum_tail(start, -1)
+
+    return p
 
 
 def two_proportion_z(a: int, n_focal: int, c: int, n_reference: int) -> TestResult:

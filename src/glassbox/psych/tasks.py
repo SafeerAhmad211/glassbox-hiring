@@ -42,14 +42,37 @@ class BartTrial:
     """One balloon in the Balloon Analogue Risk Task.
 
     Args:
-        pumps: Number of pumps the participant made.
+        pumps: Number of pumps the participant made. Must be non-negative.
         exploded: Whether the balloon burst.
         max_pumps: The balloon's burst threshold, if known.
+
+    Raises:
+        ValueError: If ``pumps`` is negative, ``max_pumps`` is not positive, or the
+            trial is internally inconsistent.
+
+    Note:
+        Validation matters more here than it looks. A negative or impossible pump
+        count silently produces a negative "adjusted average pumps", which is not a
+        detectably wrong number downstream -- it just looks like a low risk-taker.
+        Behavioural telemetry arrives from browsers and is easy to corrupt or forge,
+        so the constructor is the right place to stop it.
     """
 
     pumps: int
     exploded: bool
     max_pumps: int | None = None
+
+    def __post_init__(self) -> None:
+        if self.pumps < 0:
+            raise ValueError(f"pumps must be non-negative, got {self.pumps}")
+        if self.max_pumps is not None:
+            if self.max_pumps < 1:
+                raise ValueError(f"max_pumps must be positive, got {self.max_pumps}")
+            if self.pumps > self.max_pumps:
+                raise ValueError(
+                    f"pumps ({self.pumps}) exceeds max_pumps ({self.max_pumps}): "
+                    "a balloon cannot be pumped past its burst point"
+                )
 
 
 def bart_score(trials: Sequence[BartTrial]) -> dict[str, float | None]:

@@ -83,7 +83,19 @@ def extract_pdf_blocks(path: Path | str) -> tuple[list[TextBlock], dict[str, Any
     counter = 0
     page_count = 0
 
-    for page_number, page_layout in enumerate(extract_pages(str(path))):
+    try:
+        pages = list(extract_pages(str(path)))
+    except Exception as exc:
+        # pdfminer raises its own hierarchy (PDFSyntaxError, PSEOF, ...) that inherits
+        # from neither OSError nor ValueError, so without this every corrupt or
+        # non-PDF file reaches the user as a raw traceback. A tool whose entire job is
+        # reading documents people hand it must fail with a sentence, not a stack.
+        raise ValueError(
+            f"Could not read {Path(path).name!r} as a PDF: {exc}. "
+            "The file may be corrupt, truncated, password-protected, or not a PDF."
+        ) from exc
+
+    for page_number, page_layout in enumerate(pages):
         page_count += 1
         for element in page_layout:
             if isinstance(element, (LTImage, LTFigure)):

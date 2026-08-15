@@ -236,6 +236,16 @@ def audit_scorer_invariance(
             "Needs a non-empty resume list and a non-negative tolerance.",
             "Supply at least one resume.",
         )
+    except Exception as exc:
+        # `scorer` is arbitrary caller code -- typically an HTTP call to a model
+        # endpoint. Its failure is an ordinary operational event, not a bug in this
+        # tool, and an agent must receive it as a recoverable observation rather
+        # than a traceback.
+        return _error(
+            f"The supplied scorer raised {type(exc).__name__}: {exc}",
+            "The failure came from the scorer callable, not from the audit itself.",
+            "Verify the scorer runs standalone on one resume, then retry.",
+        )
 
     spread = {k: round(v, 6) for k, v in report.dimension_spread().items()}
 
@@ -558,6 +568,19 @@ def call(tool_name: str, /, **kwargs: Any) -> Observation:
             f"Invalid arguments for {tool_name}: {exc}",
             "An argument is missing, misspelled, or of the wrong type.",
             f"Check the signature via tool_schemas()[{tool_name!r}] and retry.",
+        )
+    except Exception as exc:
+        # Last-resort net. The harness guarantees that no dispatched call raises:
+        # an agent recovers from a message far more reliably than from a traceback,
+        # and a tool that escapes this contract can strand an autonomous loop. Tools
+        # should still handle their own expected failures with specific guidance --
+        # this only catches what they missed.
+        return _error(
+            f"{tool_name} failed unexpectedly with {type(exc).__name__}: {exc}",
+            "This is an unhandled error inside the tool, not a problem with the "
+            "inputs as such.",
+            "Retry with simpler inputs to isolate the cause, and report it as a bug "
+            "if it persists.",
         )
 
 

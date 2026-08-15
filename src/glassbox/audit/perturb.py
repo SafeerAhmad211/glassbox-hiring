@@ -30,6 +30,7 @@ inferred.
 
 from __future__ import annotations
 
+import math
 import re
 import statistics
 from collections.abc import Callable, Sequence
@@ -353,12 +354,40 @@ def run_perturbation_audit(
 
     probes = list(perturbations) if perturbations is not None else DEFAULT_PERTURBATIONS
 
-    baselines = [scorer(resume) for resume in resumes]
+    def score_checked(text: str, context: str) -> float:
+        """Call the scorer and reject anything that is not a finite number.
+
+        A non-finite score is not merely odd, it produces an inconsistent report:
+        ``inf - inf`` is ``nan``, and because every comparison with ``nan`` is false,
+        the run registers as *not invariant* while listing *no violations*. A caller
+        that checks ``is_invariant`` and then reads ``violations[0]`` crashes on an
+        empty list. Rejecting the input is the only way to keep those two properties
+        consistent.
+        """
+        value = scorer(text)
+        try:
+            numeric = float(value)
+        except (TypeError, ValueError) as exc:
+            raise TypeError(
+                f"scorer returned {type(value).__name__} for {context}; "
+                "it must return a number"
+            ) from exc
+        if not math.isfinite(numeric):
+            raise ValueError(
+                f"scorer returned non-finite value {numeric!r} for {context}; "
+                "scores must be finite for deltas to be meaningful"
+            )
+        return numeric
+
+    baselines = [score_checked(r, "the unmodified resume") for r in resumes]
     baseline_mean = sum(baselines) / len(baselines)
 
     results = []
     for probe in probes:
-        perturbed_scores = [scorer(probe.apply(resume)) for resume in resumes]
+        perturbed_scores = [
+            score_checked(probe.apply(resume), f"perturbation {probe.name!r}")
+            for resume in resumes
+        ]
         deltas = [p - b for p, b in zip(perturbed_scores, baselines, strict=True)]
         results.append(
             PerturbationResult(

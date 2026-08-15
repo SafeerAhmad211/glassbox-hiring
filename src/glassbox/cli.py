@@ -173,7 +173,9 @@ def _cmd_lens(args: argparse.Namespace) -> int:
         )
         return 2
     except (OSError, ValueError) as exc:
-        print(f"[ERROR] Could not read {args.resume}: {exc}", file=sys.stderr)
+        # The extractor's ValueError already names the file and the cause, so do not
+        # prefix it again.
+        print(f"[ERROR] {exc}", file=sys.stderr)
         return 2
 
     observation = call(

@@ -16,6 +16,7 @@ Coordinates use the PDF convention: origin at bottom-left, y increasing upward.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 __all__ = [
@@ -50,6 +51,27 @@ class TextBlock:
     page: int = 0
     emit_index: int = 0
     width: float | None = None
+
+    def __post_init__(self) -> None:
+        """Reject non-finite geometry.
+
+        NaN coordinates do not fail loudly -- they poison comparisons silently. A
+        single NaN x makes every ``<`` comparison false, so span merging collapses,
+        column detection reports one column, and a two-column resume is declared
+        clean. That is the exact failure this module exists to catch, so a malformed
+        coordinate must raise rather than quietly produce a passing result.
+
+        Raises:
+            ValueError: If any coordinate is NaN or infinite.
+        """
+        for field_name, value in (("x", self.x), ("y", self.y), ("size", self.size)):
+            if not math.isfinite(value):
+                raise ValueError(
+                    f"TextBlock {field_name} must be finite, got {value!r} "
+                    f"(text={self.text[:30]!r})"
+                )
+        if self.width is not None and not math.isfinite(self.width):
+            raise ValueError(f"TextBlock width must be finite, got {self.width!r}")
 
     @property
     def width_estimate(self) -> float:
