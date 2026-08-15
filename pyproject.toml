@@ -57,6 +57,9 @@ dev = [
     # Required by tests/test_packaging.py to assert the release workflow's security
     # properties. Without it those tests skip, and a regression ships unnoticed.
     "pyyaml>=6.0",
+    # tomllib is stdlib from 3.11; 3.10 needs the backport to read pyproject.toml
+    # in tests/test_packaging.py.
+    "tomli>=2.0; python_version < '3.11'",
     # scipy is NOT a runtime dependency -- the audit core stays stdlib-only. It is
     # used solely as an independent reference implementation in differential tests.
     "scipy>=1.11",

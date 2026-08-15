@@ -8,12 +8,23 @@ the release workflow assumes, at development time rather than at upload time.
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 
 import pytest
-import tomllib
 
 import glassbox
+
+# tomllib is stdlib only from Python 3.11, and this project supports 3.10. Reading
+# pyproject.toml is a development-time concern, so tomli is a dev dependency; the
+# shipped package still installs with zero dependencies.
+if sys.version_info >= (3, 11):
+    import tomllib
+else:  # pragma: no cover - exercised on 3.10 only
+    try:
+        import tomli as tomllib
+    except ImportError:  # pragma: no cover
+        tomllib = None  # type: ignore[assignment]
 
 REPO = Path(__file__).resolve().parents[1]
 PYPROJECT = REPO / "pyproject.toml"
@@ -26,6 +37,8 @@ pytestmark = pytest.mark.skipif(
 
 @pytest.fixture(scope="module")
 def pyproject() -> dict:
+    if tomllib is None:  # pragma: no cover
+        pytest.skip("needs tomllib (3.11+) or tomli; install the dev extra")
     return tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
 
 
