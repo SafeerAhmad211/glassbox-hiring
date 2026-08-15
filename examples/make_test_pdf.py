@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["build_pdf", "two_column_resume", "single_column_resume"]
+__all__ = ["build_pdf", "single_column_resume", "two_column_resume"]
 
 
 def build_pdf(items: list[tuple[str, float, float, float]]) -> bytes:

@@ -51,7 +51,7 @@ jobs:
           print("audit core is stdlib-only")
 
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src tests examples
 
       - name: Type check
         run: mypy src/glassbox --ignore-missing-imports

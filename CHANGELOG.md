@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.1.2 — 2026-08-15
+
+### Added
+
+- `examples/end_to_end.py` — a complete, runnable walkthrough: build a transparent
+  screener, verify it is counterfactually invariant to names, then find adverse impact
+  in its outcomes anyway. Demonstrates why both audits are needed, since passing one
+  says nothing about the other.
+- A **Usage example** section in the README, built from that script's real output.
+- `tests/test_examples.py` — runs the shipped examples and pins every number the README
+  quotes, so documented output cannot silently drift.
+
+### Fixed
+
+- **The example script crashed on Windows** with `UnicodeEncodeError`. `explain()`
+  emits `✓`, which the default console codepage (cp1252) cannot encode, so the exact
+  command the README tells people to run failed. The script now reconfigures stdout,
+  and `explain()` documents the requirement for anyone printing its output.
+- CI now lints `examples/` as well as `src/` and `tests/`.
+
 ## 0.1.1 — 2026-08-15
 
 Bug-fix release. Every item below was found by adversarial testing of 0.1.0 and now

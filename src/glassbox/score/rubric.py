@@ -137,6 +137,16 @@ class MatchResult:
 
         The output accounts for 100% of the score. Anything a reader cannot find here
         did not contribute.
+
+        Note:
+            The result contains ``✓`` and ``✗``, which the default Windows console
+            codepage (cp1252) cannot encode -- ``print()`` raises ``UnicodeEncodeError``
+            there. Reconfigure the stream first::
+
+                sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+            The ``glassbox`` CLI does this internally; see ``examples/end_to_end.py``
+            for the same two lines in a standalone script.
         """
         lines = [
             f"Match score: {self.score:.3f}",

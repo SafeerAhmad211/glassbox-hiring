@@ -45,6 +45,113 @@ the EU AI Act classifies employment AI as high-risk.
 
 ---
 
+## Usage example
+
+The complete script is [`examples/end_to_end.py`](examples/end_to_end.py) — runnable
+as-is, no data files, no network:
+
+```bash
+python examples/end_to_end.py
+```
+
+It builds a transparent screener, then audits it two different ways. Define the rubric
+and score a candidate:
+
+```python
+from glassbox.score.rubric import Requirement, Rubric, score_resume
+
+rubric = Rubric([
+    Requirement("Python",     ("python",),                 weight=3.0, required=True),
+    Requirement("PostgreSQL", ("postgres", "postgresql"),  weight=2.0),
+    Requirement("Kubernetes", ("kubernetes", "k8s"),       weight=2.0),
+    Requirement("Docker",     ("docker",),                 weight=1.0),
+], name="Backend Engineer")
+
+def screen(resume_text: str) -> float:
+    return score_resume(resume_text, rubric).score
+
+print(score_resume(candidate_resume, rubric).explain())
+```
+
+```
+Match score: 1.000
+
+Every point below traces to a requirement and a line of the resume.
+
+MATCHED:
+  ✓ Python                   +0.375  line 7: 'Built services in Python with PostgreSQL, Kubernetes...'
+  ✓ PostgreSQL               +0.250  line 7: 'Built services in Python with PostgreSQL, Kubernetes...'
+  ✓ Kubernetes               +0.250  line 7: 'Built services in Python with PostgreSQL, Kubernetes...'
+  ✓ Docker                   +0.125  line 7: 'Built services in Python with PostgreSQL, Kubernetes...'
+```
+
+**Audit 1 — is the scorer sensitive to names?** This needs no demographic data:
+
+```python
+from glassbox.audit.perturb import run_perturbation_audit
+
+perturbation = run_perturbation_audit(all_resumes, screen)
+print(perturbation.is_invariant)        # True
+print(perturbation.dimension_spread())  # {'name': 0.0, 'pronoun': 0.0}
+```
+
+Clean. Swapping a candidate's name moves the score by exactly zero.
+
+**Audit 2 — do the outcomes differ anyway?**
+
+```python
+from glassbox.audit.impact import adverse_impact
+
+report = adverse_impact(
+    {"Cohort A": (5, 6), "Cohort B": (1, 6)},
+    category="cohort",
+    threshold_label="score >= 0.75",
+)
+```
+
+```
+  Cohort A   5/6 selected  rate=0.833  IR=reference
+  Cohort B   1/6 selected  rate=0.167  IR=0.200  <-- below 0.80
+              needs 3 more selection(s) to reach 0.80
+
+passes four-fifths: False
+  note: Small samples (n<30) ... rate differences based on small numbers that are
+        not statistically significant may not constitute adverse impact.
+  note: Below 0.8 but not significant at p<=0.05: Cohort B. Practically notable,
+        statistically unresolved -- collect more data rather than concluding.
+```
+
+**This is the whole point of running both.** The scorer is provably blind to names, and
+it still selects one cohort at a fifth of the rate of the other — because the skills it
+rewards are distributed differently. Counterfactual invariance and adverse impact are
+different properties, and passing one tells you nothing about the other.
+
+Note also what the tool refuses to do: at n=6 it reports the disparity *and* tells you
+the numbers are too small to conclude from. It does not hand you a verdict you haven't
+earned.
+
+**Then check whether the finding survives a different cut score:**
+
+```python
+from glassbox.audit.impact import impact_ratio_curve
+
+for point in impact_ratio_curve(scores_by_cohort, percentiles=(10, 25, 50, 75)):
+    print(point.percentile, point.min_impact_ratio, point.passes)
+```
+
+```
+ percentile  threshold   min IR  sel rate  verdict
+         10      0.375    1.000     1.000  PASS
+         25      0.500    0.667     0.833  FAIL
+         50      0.625    0.333     0.667  FAIL
+         75      0.875    0.333     0.333  FAIL
+```
+
+Same scorer, same candidates, opposite verdicts. Report the threshold or the ratio
+means nothing.
+
+---
+
 ## Quick start
 
 ### Is this screener producing adverse impact?
