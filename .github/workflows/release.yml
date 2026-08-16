@@ -150,21 +150,55 @@ jobs:
           name: distributions
           path: dist/
 
+      - name: Create a clean virtual environment
+        shell: bash
+        run: |
+          # Install into a fresh venv rather than the runner's interpreter. The hosted
+          # macOS image ships certifi in its Python toolcache, so a check that diffs
+          # the whole environment reports a preinstalled package as our dependency.
+          # A venv contains only pip and setuptools, which makes that check meaningful.
+          python -m venv .venv
+          if [ -x ".venv/Scripts/python.exe" ]; then
+            echo "VENV_PY=$PWD/.venv/Scripts/python.exe" >> "$GITHUB_ENV"
+            echo "$PWD/.venv/Scripts" >> "$GITHUB_PATH"
+          else
+            echo "VENV_PY=$PWD/.venv/bin/python" >> "$GITHUB_ENV"
+            echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          fi
+
       - name: Install the wheel
         shell: bash
         # Quoted: the colons in `--only-binary=:all:` would otherwise be read as a
         # YAML mapping and the workflow would not parse.
-        run: "python -m pip install --only-binary=:all: dist/*.whl"
+        run: "\"$VENV_PY\" -m pip install --only-binary=:all: dist/*.whl"
 
-      - name: Confirm the install has no third-party dependencies
+      - name: Confirm the distribution declares no runtime dependencies
         shell: bash
         run: |
-          # The zero-dependency guarantee is the reason this library is expected to
-          # still run in ten years. Assert it against the installed distribution.
-          extra=$(python -m pip list --format=freeze \
+          # The authoritative check: what does the built distribution's own metadata
+          # require? This is environment-independent, so a preinstalled package in the
+          # runner image cannot produce a false positive. Extras (parse, scrape, dev)
+          # are marked with `extra == ...` and are not runtime requirements.
+          "$VENV_PY" - <<'PY'
+          from importlib.metadata import requires
+
+          declared = requires("glassbox-hiring") or []
+          runtime = [r for r in declared if "extra ==" not in r]
+          if runtime:
+              print("::error::Distribution declares runtime dependencies: " + ", ".join(runtime))
+              raise SystemExit(1)
+          print(f"Metadata declares no runtime dependencies ({len(declared)} extras-only)")
+          PY
+
+      - name: Confirm nothing was installed alongside it
+        shell: bash
+        run: |
+          # Belt and braces: the venv should now contain only pip, setuptools and the
+          # package itself. Meaningful now that the environment starts clean.
+          extra=$("$VENV_PY" -m pip list --format=freeze \
             | grep -viE "^(pip|setuptools|wheel|glassbox)" || true)
           if [ -n "$extra" ]; then
-            echo "::error::Base install pulled third-party packages:"
+            echo "::error::Installing the wheel pulled in third-party packages:"
             echo "$extra"
             exit 1
           fi
@@ -173,7 +207,7 @@ jobs:
       - name: Smoke-test the installed package
         shell: bash
         run: |
-          python - <<'PY'
+          "$VENV_PY" - <<'PY'
           from glassbox import __version__
           from glassbox.audit import adverse_impact
           from glassbox.audit.stats import fisher_exact_2x2

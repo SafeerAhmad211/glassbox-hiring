@@ -198,3 +198,27 @@ class TestReleaseWorkflow:
                 if "pypi-publish" in uses:
                     assert "@master" not in uses
                     assert "@" in uses
+
+    def test_verify_installs_into_a_clean_virtualenv(self, workflow):
+        """The wheel must be installed into a venv, not the runner's interpreter.
+
+        The hosted macOS image ships certifi in its Python toolcache. Checking the
+        whole environment for stray packages therefore reported a preinstalled one
+        as ours, failing both macOS jobs on a dependency leak that did not exist.
+        """
+        steps = workflow["jobs"]["verify"]["steps"]
+        assert any("virtual environment" in str(s.get("name", "")).lower() for s in steps)
+        assert any("python -m venv" in str(s.get("run", "")) for s in steps)
+
+    def test_dependency_check_uses_distribution_metadata(self, workflow):
+        """The authoritative check must not depend on a pristine environment.
+
+        `pip list` describes the environment; `importlib.metadata.requires` describes
+        the distribution. Only the latter answers "does this package require anything
+        at runtime?" regardless of what the runner image preinstalled.
+        """
+        runs = " ".join(
+            str(s.get("run", "")) for s in workflow["jobs"]["verify"]["steps"]
+        )
+        assert "importlib.metadata" in runs
+        assert "extra ==" in runs, "extras must be excluded from the runtime check"
