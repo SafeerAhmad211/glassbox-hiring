@@ -1,6 +1,6 @@
 {
   "$schema": "./vendors.schema.json",
-  "generated": "2026-08-24",
+  "generated": "2026-08-31",
   "license": "MIT",
   "evidence_policy": {
     "note": "Every record carries per-field provenance. 'vendor' means the vendor's own claim and is NOT independently verified. 'public' means regulation, patent, peer-reviewed work, or reporting. 'inference' means our reasoning, labelled as such. Absence of a bias finding is not evidence of absence.",
@@ -586,7 +586,7 @@
       "available": true,
       "content_length": 10595,
       "skipped_reason": null,
-      "checked": "2026-08-24"
+      "checked": "2026-08-31"
     },
     {
       "id": "nyc-ll144",
@@ -594,7 +594,7 @@
       "available": true,
       "content_length": 142726,
       "skipped_reason": null,
-      "checked": "2026-08-24"
+      "checked": "2026-08-31"
     }
   ]
 }
