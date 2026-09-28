@@ -1,6 +1,6 @@
 {
   "$schema": "./vendors.schema.json",
-  "generated": "2026-09-21",
+  "generated": "2026-09-28",
   "license": "MIT",
   "evidence_policy": {
     "note": "Every record carries per-field provenance. 'vendor' means the vendor's own claim and is NOT independently verified. 'public' means regulation, patent, peer-reviewed work, or reporting. 'inference' means our reasoning, labelled as such. Absence of a bias finding is not evidence of absence.",
@@ -586,15 +586,15 @@
       "available": true,
       "content_length": 10595,
       "skipped_reason": null,
-      "checked": "2026-09-21"
+      "checked": "2026-09-28"
     },
     {
       "id": "nyc-ll144",
       "url": "https://rules.cityofnewyork.us/rule/automated-employment-decision-tools-2/",
-      "available": true,
-      "content_length": 142726,
-      "skipped_reason": null,
-      "checked": "2026-09-21"
+      "available": false,
+      "content_length": 0,
+      "skipped_reason": "disallowed by robots.txt",
+      "checked": "2026-09-28"
     }
   ]
 }
